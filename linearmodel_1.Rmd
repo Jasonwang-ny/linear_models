@@ -25,8 +25,6 @@ nyc_airbnb =
          neighborhood = neighbourhood) %>% 
   filter(boro != "Staten Island") %>% 
   select(price, stars, boro, neighborhood, room_type)
-
-
 ```
 
 ```{r}
@@ -34,6 +32,7 @@ fit = lm(price ~ stars + boro, data = nyc_airbnb)
 
 ```
 
+### start the data clean
 
 ```{r}
 nyc_airbnb = 
@@ -46,13 +45,13 @@ fit = lm(price ~ stars + boro, data = nyc_airbnb)
 
 
 ### review the result of lm
-```{r}
+```{r, message = FALSE}
 summary(fit)
 summary(fit)$coef
 coef(fit)
 fitted.values(fit)
 
-## tidy the lm
+## tidy the result of lm
 fit %>% 
   broom::tidy() %>% 
   select(term, estimate, p.value) %>% 
@@ -61,11 +60,96 @@ fit %>%
 
 ```
 
+#### take a look at factors...
+```{r}
+
+
+```
+
+
 
 ###add the residual and prediction value to original dataset
 ```{r}
 modelr::add_residuals(nyc_airbnb, fit)
+modelr::add_predictions(nyc_airbnb, fit)
 
+
+```
+###draw a violin plot
+```{r}
+nyc_airbnb %>% 
+  modelr::add_residuals(fit) %>% 
+  filter(resid != "NA") %>% 
+  ggplot(aes(x = boro, y = resid)) + geom_violin()
+
+
+```
+
+
+```{r}
+nyc_airbnb %>% 
+  modelr::add_residuals(fit) %>% 
+  ggplot(aes(x = stars, y = resid)) + 
+  geom_point() +
+  ylim(0, 1000)
+```
+
+## nesting
+
+everyone loves nesting...
+```{r}
+fit_interaction = lm(price ~ stars * boro, data = nyc_airbnb)
+
+fit_interaction
+
+```
+
+
+```{r}
+
+fit_interaction = lm(price ~ stars * boro + room_type * boro, data = nyc_airbnb)
+
+fit_interaction %>% 
+  broom::tidy()
+```
+
+```{r}
+
+nyc_airbnb %>% 
+  nest(data = -boro) %>% 
+  mutate(
+    models = map(.x = data, ~lm(price ~ stars + room_type, data = .x)),
+    results = map(models, broom::tidy)
+  ) %>% 
+  select(boro, results)
+ 
+```
+
+```{r}
+manhattan_airbnb =
+  nyc_airbnb %>% 
+  filter(boro == "Manhattan")
+
+manhattan_nest_lm_res =
+  manhattan_airbnb %>% 
+  group_by(neighborhood) %>% 
+  nest() %>% 
+  mutate(models = map(data, ~lm(price ~ stars + room_type, data = .x)),
+         models = map(models, broom::tidy)) %>% 
+  select(-data) %>% 
+  unnest()
+```
+
+
+
+
+```{r}
+manhattan_nest_lm_res %>% 
+  filter(str_detect(term, "room_type")) %>% 
+  ggplot(aes(x = neighborhood, y = estimate)) + 
+  geom_point() + 
+  facet_wrap(~term) + 
+  theme(axis.text.x = element_text(angle = 80, hjust = 1))
 
 ```
 
